@@ -54,11 +54,6 @@ export function App() {
     <a className="skip-link" href="#main-content" onClick={event => {
       event.preventDefault(); document.getElementById('main-content')?.focus();
     }}>Skip to content</a>
-    <header className="app-bar"><button className="brand" onClick={() => navigate({ page: 'library' })} aria-label="Kanzi home">
-      <span className="brand-symbol" aria-hidden="true">k<span>.</span></span><span>kanzi</span></button>
-      <span className="brand-caption">A little word. A wider world.</span>
-      <span className="language-pair">EN <span aria-hidden="true">↔</span> <span lang="fa" className="font-persian">فا</span></span>
-    </header>
     <main id="main-content" tabIndex={-1}>
       {route.page === 'library' && <LibraryPage words={words} loading={library.loading && !words.length}
         error={library.error} onRetry={library.retry} onSearch={() => navigate({ page: 'search' })}
@@ -74,6 +69,6 @@ export function App() {
           onBack={() => navigate(returnRoute.current)} onAdd={addWord} onChanged={library.refresh} onNotify={setToast} />)}
     </main>
     {toast && <div className="toast" role="status">{toast}</div>}
-    <footer className="app-footer">{isDemo ? 'Demo preview · Sample vocabulary stored in this browser.' : 'Your words, growing with you.'}</footer>
+    <footer className="app-footer">{isDemo ? 'Demo preview · Sample vocabulary stored in this browser.' : null}</footer>
   </div>;
 }

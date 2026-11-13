@@ -65,8 +65,6 @@ export function SearchPage(props: Props) {
             {discover && <h2 className="section-title">{group === 'match' ? 'Match' : 'Suggested'}</h2>}
             <div className="word-grid">{words.map(renderWord)}</div></section> : null;
         })}</div>}
-    </> : !query && <EmptyState title={discover ? 'Find your next word' : 'Find a familiar word'}>
-      <p>{bilingual ? 'Search in English or فارسی.' : 'Search in English.'}</p>{discover && <p className="mt-1">{bilingual ? 'Try “present”, “هدیه” or “responsibility”.' : 'Try “present” or “responsibility”.'}</p>}
-    </EmptyState>}
+    </> : null}
   </section>;
 }
