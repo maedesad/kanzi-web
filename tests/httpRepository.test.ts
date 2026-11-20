@@ -21,11 +21,26 @@ describe('kanzi-api contract integration', () => {
     expect(fromApiCard({ ...card, meanings: [card.meanings[1]] }).meanings[0].id).toBe(mapped.meanings[1].id);
     expect(() => fromApiCard({ word: 'Invalid' })).toThrow('invalid vocabulary card');
   });
-  it('reads names and card details through the actual endpoints and filters locally', async () => {
+  it('lists the whole library through /cards and searches live through /cards/search', async () => {
     fetchMock.mockResolvedValueOnce(json(['Present', 'Present'])).mockResolvedValueOnce(json(card));
     const words = await createHttpRepository().listWords('PRES');
     expect(words.map(word => word.text)).toEqual(['Present']);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/cards/search?q=PRES', '/api/cards/Present']);
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(json(['Present'])).mockResolvedValueOnce(json(card));
+    const all = await createHttpRepository().listWords();
+    expect(all.map(word => word.text)).toEqual(['Present']);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/cards', '/api/cards/Present']);
+  });
+  it('live searches saved and draft matches without generating a card', async () => {
+    const repository = createHttpRepository();
+    fetchMock.mockResolvedValueOnce(json(['Present'])).mockResolvedValueOnce(json(card));
+    const { match } = await repository.searchWords('pres', undefined, { live: true });
+    expect(match.map(word => word.text)).toEqual(['Present']);
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+      ['/api/cards/search?q=pres', undefined],
+      ['/api/cards/Present', undefined],
+    ]);
   });
   it('generates on explicit search, caches the draft and submits selected meaning content', async () => {
     const repository = createHttpRepository();

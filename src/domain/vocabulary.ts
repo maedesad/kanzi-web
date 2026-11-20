@@ -21,7 +21,7 @@ export interface VocabularyRepository {
   capabilities: { deleteWords: boolean; deleteMeanings: boolean; translations: boolean; suggestions: boolean };
   listWords(query?: string, signal?: AbortSignal): Promise<Word[]>;
   getWord(id: string, signal?: AbortSignal): Promise<Word>;
-  searchWords(query: string, signal?: AbortSignal): Promise<SearchResults>;
+  searchWords(query: string, signal?: AbortSignal, options?: { live?: boolean }): Promise<SearchResults>;
   addWord(id: string, meaningIds: string[]): Promise<Word>;
   deleteWord(id: string): Promise<void>;
   deleteMeaning(wordId: string, meaningId: string): Promise<Word>;

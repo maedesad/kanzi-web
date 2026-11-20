@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SearchResults, Word } from '../../domain/vocabulary';
 import { repository } from '../../data/repository';
 import { useAsync } from '../../hooks/useAsync';
+import { useDebounce } from '../../hooks/useDebounce';
 import { SearchBar } from '../../components/SearchBar';
 import { EmptyState, ErrorNotice, Icon, IconButton, Loading } from '../../components/ui';
 import { ResultItem } from './ResultItem';
@@ -23,13 +24,25 @@ export function SearchPage(props: Props) {
   const bilingual = repository.capabilities.translations;
   const [value, setValue] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+  const [submitToken, setSubmitToken] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const debouncedValue = useDebounce(value, 250);
+  useEffect(() => {
+    // Adopt the input into the query once typing pauses; explicit submits set it directly.
+    if (value === debouncedValue && value !== query) {
+      setQuery(value);
+      onQuery(value);
+    }
+  }, [value, debouncedValue, query, onQuery]);
+  // Live searches never generate; only an explicit submit may generate a new card.
+  const live = query !== submittedQuery;
   const result = useAsync<SearchResults>(async signal => {
     if (!query) return { match: [], suggested: [] };
-    return discover ? repository.searchWords(query, signal) :
+    return discover ? repository.searchWords(query, signal, { live }) :
       { match: await repository.listWords(query, signal), suggested: [] };
-  }, [query, discover, revision]);
+  }, [query, discover, revision, submitToken]);
   const total = (result.data?.match.length ?? 0) + (result.data?.suggested.length ?? 0);
   async function add(word: Word) {
     setBusyId(word.id); setError('');
@@ -52,7 +65,8 @@ export function SearchPage(props: Props) {
       <p className="search-description">{bilingual ? <>Search for a word in your second language <strong>or enter its meaning in your first language</strong> to discover matching vocabulary.</> :
         'Search for an English word to create its vocabulary card. Translations and suggested words are not available yet.'}</p></header>}
     <SearchBar value={value} onChange={setValue} autoFocus placeholder={bilingual ? 'English or فارسی' : 'Type an English word…'} onSearch={next => {
-      setQuery(next); onQuery(next); setError(''); result.retry();
+      setValue(next); setQuery(next); setSubmittedQuery(next); setSubmitToken(token => token + 1);
+      onQuery(next); setError('');
     }} />
     {error && <ErrorNotice message={error} />}
     {result.error && <ErrorNotice message={result.error} onRetry={result.retry} />}

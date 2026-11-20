@@ -12,6 +12,10 @@ test('real API shapes drive discovery, draft selection, saving and read-only sav
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === '/api/cards' && request.method() === 'GET') return route.fulfill({ json: [...cards.keys()] });
+    if (path === '/api/cards/search') {
+      const query = new URL(request.url()).searchParams.get('q') ?? '';
+      return route.fulfill({ json: [...cards.keys()].filter(name => name.toLowerCase().includes(query.toLowerCase())) });
+    }
     if (path === '/api/cards' && request.method() === 'POST') {
       savedPayload = request.postDataJSON(); cards.set('Unfamiliar', savedPayload as typeof card);
       return route.fulfill({ status: 201, json: savedPayload });

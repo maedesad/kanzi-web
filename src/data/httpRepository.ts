@@ -1,4 +1,4 @@
-import { matchesWord, normalizeQuery, type VocabularyRepository, type Word } from '../domain/vocabulary';
+import { normalizeQuery, type VocabularyRepository, type Word } from '../domain/vocabulary';
 import { apiRequest } from './api/client';
 import { fromApiCard, toApiCard } from './api/cardMapper';
 
@@ -7,6 +7,7 @@ export const endpoints = {
   cards: '/cards',
   card: (word: string) => `/cards/${encodeURIComponent(word)}`,
   generate: (word: string) => `/cards/${encodeURIComponent(word)}/generate`,
+  search: (query: string) => `/cards/search?q=${encodeURIComponent(query)}`,
 };
 
 export function createHttpRepository(): VocabularyRepository {
@@ -19,26 +20,44 @@ export function createHttpRepository(): VocabularyRepository {
     }
     return [...new Set(names as string[])];
   }
+  async function matchedNames(query: string, signal?: AbortSignal): Promise<string[]> {
+    const names = await apiRequest(endpoints.search(query), { signal });
+    if (!Array.isArray(names) || names.some(name => typeof name !== 'string')) {
+      throw new Error('The API returned an invalid word list.');
+    }
+    return [...new Set(names as string[])];
+  }
+  async function readCards(names: string[], signal?: AbortSignal): Promise<Word[]> {
+    const cards: Word[] = [];
+    // The search endpoint returns names only; limit concurrent detail requests.
+    for (let index = 0; index < names.length; index += 4) {
+      cards.push(...await Promise.all(names.slice(index, index + 4).map(name => readCard(name, signal))));
+    }
+    return cards;
+  }
   async function readCard(id: string, signal?: AbortSignal): Promise<Word> {
     return fromApiCard(await apiRequest(endpoints.card(id), { signal }));
   }
   return {
     capabilities: { deleteWords: false, deleteMeanings: false, translations: false, suggestions: false },
     async listWords(query = '', signal) {
-      const names = await savedNames(signal);
-      const cards: Word[] = [];
-      // The current list endpoint returns names only; limit concurrent detail requests.
-      for (let index = 0; index < names.length; index += 4) {
-        cards.push(...await Promise.all(names.slice(index, index + 4).map(name => readCard(name, signal))));
-      }
-      return cards.filter(card => matchesWord(card, query));
+      // Live queries are resolved by the API's fuzzy search; empty query lists the whole library.
+      const names = query ? await matchedNames(query, signal) : await savedNames(signal);
+      return readCards(names, signal);
     },
     async getWord(id, signal) { return drafts.get(id) ?? readCard(id, signal); },
-    async searchWords(query, signal) {
+    async searchWords(query, signal, options) {
       const needle = normalizeQuery(query);
       if (!needle) return { match: [], suggested: [] };
       if (/[\u0600-\u06ff]/.test(query)) {
         throw new Error('Persian search is not available yet. Please search with an English word.');
+      }
+      if (options?.live) {
+        // While typing: saved and draft matches only; generation happens on explicit submit.
+        const names = await matchedNames(query, signal);
+        const matches = await readCards(names, signal);
+        const draftMatches = [...drafts.values()].filter(word => normalizeQuery(word.text).includes(needle));
+        return { match: [...matches, ...draftMatches], suggested: [] };
       }
       const existing = (await savedNames(signal)).find(name => normalizeQuery(name) === needle);
       if (existing) return { match: [await readCard(existing, signal)], suggested: [] };
